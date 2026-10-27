@@ -174,7 +174,7 @@ tr.done td:first-child{box-shadow:inset -4px 0 0 var(--ok)}
       <ol class="helpsteps">
         <li>أضف كل صف وشعبه: ارفع ملف Excel لكل شعبة، أو ملفاً واحداً فيه ورقة لكل شعبة، أو عموداً للشعبة.</li>
         <li>اختر الشعبة التي تصحّحها الآن، وحدّد مفتاح إجابات الصف. الشعب في الصف الواحد تشترك في المفتاح.</li>
-        <li>في «التصحيح» اضغط الميكروفون مرة واحدة، ثم قل اسم الطالب وحروف إجاباته: «اي، بي، سي، دي». ويمكنك قولها في نَفَس واحد: «ژیار ئازاد اي بي سي دي احفظ».</li>
+        <li>في «التصحيح» اضغط الميكروفون مرة واحدة، ثم قل اسم الطالب وأرقام إجاباته: 1 بدل A، و2 بدل B، و3 بدل C، و4 بدل D. ويمكنك قولها في نَفَس واحد: «ژیار ئازاد 1 2 3 4 احفظ».</li>
         <li>إذا تكرر اسم أو كان الطالب مصحَّحاً من قبل، يتوقف التطبيق وينبّهك بصوت ولا يصحّح.</li>
         <li>من «التصدير» نزّل ملف كل صف وفيه الدرجة النهائية أمام كل اسم.</li>
         <li>دون إنترنت: نزّل حزمة اللغة من «العمل دون إنترنت» أدناه وأنت متصل، أو اختر «بترتيب القائمة» لتقرأ الإجابات فقط.</li>
@@ -202,7 +202,9 @@ tr.done td:first-child{box-shadow:inset -4px 0 0 var(--ok)}
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const OPTS = ['A', 'B', 'C', 'D'];
+// الخيارات تُقرأ وتُعرض كأرقام 1–4 (افتراضياً) أو كحروف A–D
+const numMode = () => S.settings.choice !== 'letters';
+const optLabels = () => numMode() ? ['1', '2', '3', '4'] : ['A', 'B', 'C', 'D'];
 const STORE_KEY = 'voice-grader-v1';
 const fmt = n => String(Math.round(n * 100) / 100);
 const MIC = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/></svg>';
@@ -219,7 +221,7 @@ function defaults() {
     groups: [],            // {id, cls, sec, fid|null, sheet, headerRow, nameCol, scoreCol, secCol, secVal, results:{row:{score,...}}, extras:[]}
     keys: {},              // اسم الصف -> مفتاح الإجابات
     active: null, seq: 0,
-    settings: { mode: 'answers', nameMode: 'voice', nameLang: 'ar-IQ', ansLang: 'ar-IQ', speak: true, autoSave: false }
+    settings: { mode: 'answers', choice: 'numbers', nameMode: 'voice', nameLang: 'ar-IQ', ansLang: 'ar-IQ', speak: true, autoSave: false }
   };
 }
 // تحويل بيانات النسخة السابقة (ملف واحد) إلى صف وشعبة
@@ -633,7 +635,7 @@ function renderKey() {
     <div class="notice ${missing ? 'warn' : 'ok'}">${missing ? `ينقص تحديد الإجابة الصحيحة لـ ${missing} ${missing === 1 ? 'سؤال' : 'أسئلة'}.` : 'المفتاح مكتمل.'}</div>
     <div class="keygrid">${k.answers.map((a, q) => `
       <div class="krow ${a == null ? 'missing' : ''}"><span class="qn">س${q + 1}</span>
-        <div class="bubs" role="radiogroup" aria-label="الإجابة الصحيحة للسؤال ${q + 1}">${OPTS.map((o, i) => `<button class="bub" role="radio" aria-checked="${a === i}" aria-pressed="${a === i}" data-act="key-set" data-q="${q}" data-o="${i}">${o}</button>`).join('')}</div>
+        <div class="bubs" role="radiogroup" aria-label="الإجابة الصحيحة للسؤال ${q + 1}">${optLabels().map((o, i) => `<button class="bub" role="radio" aria-checked="${a === i}" aria-pressed="${a === i}" data-act="key-set" data-q="${q}" data-o="${i}">${o}</button>`).join('')}</div>
         <label class="pts">درجة<input type="number" class="ptsin" id="pts-${q}" data-q="${q}" min="0" step="0.25" value="${esc(k.points[q])}"></label></div>`).join('')}</div>
     <div class="row"><button class="btn primary big" data-act="go" data-step="voice">${MIC}ابدأ تصحيح ${esc(gLabel(g))}</button></div>`;
 }
@@ -644,7 +646,9 @@ function renderVoiceSettings() {
     <div class="grid2">
       <label class="field">لغة التعرّف على الأسماء<select id="s-namelang">${langs.map(([v, l]) => `<option value="${v}" ${st.nameLang === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
         <span class="small">المطابقة مع ملف الأسماء تراعي الحروف ژ چ پ ڤ گ ێ ڵ ۆ ڕ في كل الأحوال.</span></label>
-      <label class="field">لغة نطق حروف الإجابات<select id="s-anslang">${[['ar-IQ', 'العربية — «اي، بي، سي، دي»'], ['ckb-IQ', 'الكردية'], ['en-US', 'الإنجليزية — A, B, C, D']].map(([v, l]) => `<option value="${v}" ${st.ansLang === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+      <label class="field">طريقة قراءة الإجابات<select id="s-choice"><option value="numbers" ${numMode() ? 'selected' : ''}>أرقام: 1 = A، 2 = B، 3 = C، 4 = D</option><option value="letters" ${!numMode() ? 'selected' : ''}>حروف: اي، بي، سي، دي</option></select>
+        <span class="small">${numMode() ? 'لتحديد سؤال بعينه قل «سؤال» ثم رقمه، مثل: «سؤال خمسة 3».' : 'لتحديد سؤال بعينه قل رقمه قبل الحرف، مثل: «ثلاثة سي».'}</span></label>
+      <label class="field">لغة نطق الإجابات<select id="s-anslang">${[['ar-IQ', 'العربية'], ['ckb-IQ', 'الكردية'], ['en-US', 'الإنجليزية']].map(([v, l]) => `<option value="${v}" ${st.ansLang === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
     </div>
     <p class="small muted">الأسرع: لغة واحدة للأسماء والحروف، فيبقى الميكروفون يعمل دون انقطاع. اختلاف اللغتين يعيد تشغيله عند كل انتقال.</p>
     <label class="check"><input type="checkbox" id="s-speak" ${st.speak ? 'checked' : ''}> قراءة الدرجة والتنبيهات بصوت</label>
@@ -664,7 +668,7 @@ function renderOffline() {
     </tbody></table></div>` : `<div class="notice warn">هذا المتصفح لا يدعم التعرّف على الكلام دون إنترنت. استخدم أحدث إصدار من Chrome.</div>`}
     <div class="notice info"><b>إن لم تتوفر لغتك دون إنترنت:</b>
       <ul><li>اختر «تحديد الطالب: بترتيب القائمة» في شاشة التصحيح؛ يعرض التطبيق الطالب التالي تلقائياً، فتقرأ الإجابات فقط. رتّب الأوراق بترتيب أسماء الملف.</li>
-      <li>اقرأ الحروف بالإنجليزية (A, B, C, D) إن كانت حزمة الإنجليزية متاحة.</li>
+      <li>اقرأ الإجابات بالإنجليزية (one, two, three, four) إن كانت حزمة الإنجليزية متاحة.</li>
       <li>أو اكتب في حقل الإجابات بميكروفون لوحة مفاتيح الهاتف إن كانت تدعم الكتابة الصوتية دون إنترنت.</li></ul></div>`;
 }
 
@@ -690,10 +694,11 @@ const WORDS = (() => {
   const SAVE = new Set(['احفظ', 'حفظ', 'سجل', 'save', 'پاشەکەوت', 'پاشەکەوتکە', 'تۆمارکە', 'تومار'].map(loose));
   const HALF = new Set(['نص', 'ونص', 'نصف', 'ونصف', 'نیو', 'ونیو', 'half'].map(loose));
   const CLEAR = new Set(['امسح', 'مسح', 'اعد', 'اعاده', 'سڕینەوە', 'پاککردنەوە', 'clear', 'reset'].map(loose));
+  const QW = new Set(['سؤال', 'السؤال', 'سوال', 'question', 'پرسیار', 'پرسیاری'].map(loose));
   const NEXT = new Set(['تخطي', 'تخطى', 'تجاوز', 'التالي', 'بعده', 'دواتر', 'skip', 'next'].map(loose));
   const PREV = new Set(['السابق', 'رجوع', 'ارجع', 'پێشوو', 'back', 'previous'].map(loose));
   const SPELL = Object.keys(L).filter(s => !s.includes(' ')).sort((a, b) => b.length - a.length);
-  return { L, KN, N, B, F, SAVE, HALF, CLEAR, NEXT, PREV, SPELL };
+  return { L, KN, N, B, F, QW, SAVE, HALF, CLEAR, NEXT, PREV, SPELL };
 })();
 // كلمة ملتصقة مثل «ايبيسيدي» أو «ابي» تُفكّك إلى حروف إن أمكن تفكيكها كاملة
 function segmentLetters(w) {
@@ -715,15 +720,29 @@ function parseAnswers(text, n) {
   let p = 0, extra = 0, letters = 0;
   const put = v => { if (p < n) out[p] = v; else extra++; p++; letters++; };
   const jump = k => { if (k >= 1 && k <= n) p = k - 1; };
-  for (const raw of toks) {
-    if (/^\d+$/.test(raw)) { jump(+raw); continue; }
-    if (KN[raw]) { jump(KN[raw]); continue; }
+  const num = numMode();
+  const numOf = t => /^\d+$/.test(t) ? +t : (KN[t] || (N[loose(t)] > 0 ? N[loose(t)] : 0));
+  // وضع الأرقام: 1=A، 2=B، 3=C، 4=D؛ وعبارة «سؤال 5» تنقل إلى السؤال الخامس
+  const choice = k => { if (k >= 1 && k <= 4) { put(k - 1); return true; } return false; };
+  for (let ti = 0; ti < toks.length; ti++) {
+    const raw = toks[ti];
+    if (num && WORDS.QW.has(loose(raw))) { const k = toks[ti + 1] ? numOf(toks[ti + 1]) : 0; if (k) { jump(k); ti++; } continue; }
+    if (/^\d+$/.test(raw)) {
+      if (!num) { jump(+raw); continue; }
+      if (/^[1-4]+$/.test(raw)) { for (const ch of raw) put(+ch - 1); } else unknown.push(raw);   // «1234» تُفكّك إلى أربع إجابات
+      continue;
+    }
+    if (KN[raw]) { if (!num) jump(KN[raw]); else if (!choice(KN[raw])) unknown.push(raw); continue; }
     const w = loose(raw);
     if (w in L) { put(L[w]); continue; }
-    if (N[w] > 0) { jump(N[w]); continue; }
+    if (N[w] > 0) { if (!num) jump(N[w]); else if (!choice(N[w])) unknown.push(raw); continue; }
     if (B.has(w)) { put(-1); continue; }
     if (F.has(w) || !w) continue;
-    if (w.length > 1 && w[0] === 'و') { const r = w.slice(1); if (r in L) { put(L[r]); continue; } if (B.has(r)) { put(-1); continue; } }
+    if (w.length > 1 && w[0] === 'و') {
+      const r = w.slice(1);
+      if (r in L) { put(L[r]); continue; } if (B.has(r)) { put(-1); continue; }
+      if (num && N[r] > 0 && choice(N[r])) continue;
+    }
     if (/^[abcd]+$/.test(w)) { for (const ch of w) put('abcd'.indexOf(ch)); continue; }
     const seg = segmentLetters(w); if (seg) { seg.forEach(put); continue; }
     unknown.push(raw);
@@ -800,7 +819,7 @@ function applyLocal(r) {
   if ('processLocally' in r) r.processLocally = local;
   if (local && 'phrases' in r && window.SpeechRecognitionPhrase) {
     try {
-      const ph = ['A', 'B', 'C', 'D', 'اي', 'بي', 'سي', 'دي', 'احفظ', 'فارغ', 'التالي'].map(w => new SpeechRecognitionPhrase(w, 6));
+      const ph = (numMode() ? ['1', '2', '3', '4', 'واحد', 'اثنين', 'ثلاثة', 'أربعة'] : ['A', 'B', 'C', 'D', 'اي', 'بي', 'سي', 'دي']).concat(['احفظ', 'فارغ', 'التالي']).map(w => new SpeechRecognitionPhrase(w, 6));
       students().slice(0, 300).forEach(s => ph.push(new SpeechRecognitionPhrase(s.name, 4)));
       r.phrases = ph;
     } catch (e) {}
@@ -1165,7 +1184,7 @@ function offlineHtml() {
   if (ok) return `<div class="notice ok">غير متصل بالإنترنت — التعرّف يعمل داخل الجهاز.</div>`;
   const tips = [];
   if (!order) tips.push(`<button class="btn sm" data-act="v-namemode" data-mode="order">التصحيح بترتيب القائمة (لا يحتاج قراءة الأسماء)</button>`);
-  if (!isLocal(S.settings.ansLang) && isLocal('en-US')) tips.push(`<button class="btn sm" data-act="v-anslang-en">قراءة الحروف بالإنجليزية (A, B, C, D) — متاحة دون إنترنت</button>`);
+  if (!isLocal(S.settings.ansLang) && isLocal('en-US')) tips.push(`<button class="btn sm" data-act="v-anslang-en">قراءة الإجابات بالإنجليزية — متاحة دون إنترنت</button>`);
   return `<div class="notice warn alert"><b>${online ? 'التعرّف على الصوت غير متاح دون إنترنت لهذه اللغة' : 'أنت غير متصل بالإنترنت'}</b>
     <span>${need.filter(l => !isLocal(l)).map(l => `${esc(LANG_NAME[l] || l)}: ${LOCAL_TXT[LOCAL[l]] || 'غير معروف'}`).join(' · ')}</span>
     <span>يمكنك أيضاً الضغط داخل حقل الإجابات واستخدام ميكروفون لوحة مفاتيح الهاتف إن كانت تدعم الكتابة الصوتية دون إنترنت.</span>
@@ -1214,15 +1233,15 @@ function renderVoice() {
   const answersBlock = mode === 'answers' ? `
     <div class="card">
       <div class="card-head"><h3>الإجابات</h3><div class="row"><button class="btn sm" data-act="v-undo" ${V.text ? '' : 'disabled'}>حذف آخر كلمة</button><button class="btn sm" data-act="v-clear" ${V.text || Object.keys(V.manual).length ? '' : 'disabled'}>مسح الإجابات</button></div></div>
-      <p class="small muted">قل الحروف بالترتيب: «اي، بي، سي، دي». لسؤال بعينه قل رقمه قبل الحرف: «ثلاثة سي». للمتروك قل «فارغ».</p>
+      <p class="small muted">${numMode() ? 'قل الأرقام بالترتيب: 1 بدل A، و2 بدل B، و3 بدل C، و4 بدل D. لسؤال بعينه قل «سؤال خمسة 3». للمتروك قل «فارغ».' : 'قل الحروف بالترتيب: «اي، بي، سي، دي». لسؤال بعينه قل رقمه قبل الحرف: «ثلاثة سي». للمتروك قل «فارغ».'}</p>
       <label class="field">النص المسموع (يمكن تعديله)<textarea id="v-text" dir="auto" placeholder="اي بي سي دي …">${esc(V.text)}</textarea></label>
       ${f.unknown.length ? `<div class="notice warn small">كلمات لم تُفهم وتُجوهلت: ${f.unknown.map(esc).join('، ')}</div>` : ''}
       ${f.extra ? `<div class="notice warn small">سُمعت ${f.extra} إجابة زائدة بعد السؤال الأخير وتُجوهلت.</div>` : ''}
       <div class="atable">${f.answers.map((a, q) => {
         const k = K().answers[q];
-        const st = a == null ? '<span class="tag warn">لم تُسجَّل</span>' : a < 0 ? '<span class="tag">بلا إجابة</span>' : k == null ? '' : a === k ? `<span class="tag ok">صحيحة +${fmt(+K().points[q] || 0)}</span>` : `<span class="tag bad">خاطئة — الصحيحة ${OPTS[k]}</span>`;
+        const st = a == null ? '<span class="tag warn">لم تُسجَّل</span>' : a < 0 ? '<span class="tag">بلا إجابة</span>' : k == null ? '' : a === k ? `<span class="tag ok">صحيحة +${fmt(+K().points[q] || 0)}</span>` : `<span class="tag bad">خاطئة — الصحيحة ${optLabels()[k]}</span>`;
         return `<div class="arow ${a == null ? 'missing' : ''}"><span class="qn">س${q + 1}</span>
-          <div class="bubs">${OPTS.map((o, i) => `<button class="bub ${a === i && k != null ? (a === k ? 'right' : 'wrong') : ''}" aria-pressed="${a === i}" data-act="v-set" data-q="${q}" data-o="${i}">${o}</button>`).join('')}<button class="bub blank" aria-pressed="${a === -1}" data-act="v-set" data-q="${q}" data-o="-1">بلا إجابة</button></div>
+          <div class="bubs">${optLabels().map((o, i) => `<button class="bub ${a === i && k != null ? (a === k ? 'right' : 'wrong') : ''}" aria-pressed="${a === i}" data-act="v-set" data-q="${q}" data-o="${i}">${o}</button>`).join('')}<button class="bub blank" aria-pressed="${a === -1}" data-act="v-set" data-q="${q}" data-o="-1">بلا إجابة</button></div>
           <div class="meta">${st}</div></div>`;
       }).join('')}</div>
     </div>` : `
@@ -1285,7 +1304,7 @@ function renderResults() {
     <div class="tablewrap"><table><thead><tr><th>الصف</th><th>اسم الطالب</th><th>الدرجة</th><th>الإجابات</th><th></th></tr></thead><tbody>
       ${list.map(s => `<tr class="${s.res ? 'done' : ''}"><td class="num">${rowNo(s.row, g)}</td><td>${esc(s.name)}</td>
         <td><input type="number" class="r-score" id="rs-${s.row}" data-row="${s.row}" step="0.25" min="0" value="${s.res ? s.res.score : ''}" aria-label="درجة ${esc(s.name)}"></td>
-        <td class="mono small">${s.res && s.res.answers ? s.res.answers.map(a => a == null || a < 0 ? '–' : OPTS[a]).join(' ') : ''}</td>
+        <td class="mono small">${s.res && s.res.answers ? s.res.answers.map(a => a == null || a < 0 ? '–' : optLabels()[a]).join(' ') : ''}</td>
         <td>${s.res ? `<button class="btn sm danger" data-act="r-clear" data-row="${s.row}">حذف الدرجة</button>` : ''}</td></tr>`).join('')}
     </tbody></table></div>` : ''}
     ${g.extras.length ? `<h3>${g.fid ? 'غير موجودين في ملف الأسماء' : 'الدرجات المحفوظة'}</h3><div class="tablewrap"><table><thead><tr><th>الاسم</th><th>الدرجة</th><th></th></tr></thead><tbody>
@@ -1339,7 +1358,7 @@ const ACT = {
   'v-mode': b => { S.settings.mode = b.dataset.mode; save(); setPhase(nextPhase()); },
   'v-pick': b => { V.search = ''; V.block = null; selectRow(+b.dataset.row, 'pick'); if (V.row != null) { tick(); G().cursor = V.row; } setPhase(nextPhase()); },
   'v-namemode': b => { S.settings.nameMode = b.dataset.mode; save(); if (V.err === 'offline') V.err = null; if (b.dataset.mode === 'voice' && V.byOrder) V = newV(); setPhase(nextPhase()); },
-  'v-anslang-en': () => { S.settings.ansLang = 'en-US'; save(); if (V.err === 'offline') V.err = null; toast('صارت قراءة الحروف بالإنجليزية: A, B, C, D'); setPhase(nextPhase()); },
+  'v-anslang-en': () => { S.settings.ansLang = 'en-US'; save(); if (V.err === 'offline') V.err = null; toast('صارت قراءة الإجابات بالإنجليزية'); setPhase(nextPhase()); },
   'v-step': b => { const from = V.row, dir = +b.dataset.dir; V = Object.assign(newV(), { noAuto: true }); autoPick(dir, typeof from === 'number' ? from : undefined); if (V.row == null) V.noAuto = false; setPhase(nextPhase()); },
   'local-install': b => installLocal(b.dataset.lang),
   'v-regrade': () => { const r = V.block.row; V.block = null; V.regrade = true; V.row = r; V.picked = true; setPhase(nextPhase()); },
@@ -1380,6 +1399,7 @@ document.addEventListener('change', e => {
   else if (t.id === 'g-score') { g.scoreCol = +t.value; save(); renderGroup(); }
   else if (t.id === 's-namelang') { S.settings.nameLang = t.value; save(); refreshLocal(); }
   else if (t.id === 's-anslang') { S.settings.ansLang = t.value; save(); refreshLocal(); }
+  else if (t.id === 's-choice') { S.settings.choice = t.value; save(); render(); }
   else if (t.id === 's-speak') { S.settings.speak = t.checked; save(); }
   else if (t.id === 's-auto') { S.settings.autoSave = t.checked; save(); }
   else if (t.id === 'r-filter') { rFilter = t.value; renderResults(); }
